@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOTP Generator & Verifier</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            background: #f8f9fa;
+        }
+
+        .section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 5px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-right: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        .result.success {
+            background: #e6ffe6;
+            color: #00b894;
+            border-left: 4px solid #00b894;
+        }
+
+        .result.error {
+            background: #ffe6e6;
+            color: #d63031;
+            border-left: 4px solid #d63031;
+        }
+
+        .result.info {
+            background: #e6f3ff;
+            color: #0984e3;
+            border-left: 4px solid #0984e3;
+        }
+
+        .token-display {
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            padding: 20px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 3px;
+        }
+
+        .timer {
+            text-align: center;
+            font-size: 18px;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .note {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>TOTP Generator & Verifier</h1>
+            <p>Generate and verify Time-based One-Time Passwords</p>
+        </div>
+        
+        <div class="content">
+            <!-- Generate TOTP Section -->
+            <div class="section">
+                <h3>Generate TOTP</h3>
+                <div class="form-group">
+                    <label for="secretKey">Secret Key (Base32 encoded):</label>
+                    <input type="text" id="secretKey" placeholder="Enter your secret key (e.g., JBSWY3DPEHPK3PXP)" value="JBSWY3DPEHPK3PXP">
+                </div>
+                <button class="btn" onclick="generateTOTP()">Generate TOTP</button>
+                <button class="btn" onclick="generateTOTP()" id="autoRefreshBtn" style="display: none;">Stop Auto Refresh</button>
+                
+                <div id="generateResult"></div>
+                <div id="tokenDisplay" class="token-display" style="display: none;"></div>
+                <div id="timer" class="timer" style="display: none;"></div>
+            </div>
+
+            <!-- Verify TOTP Section -->
+            <div class="section">
+                <h3>Verify TOTP</h3>
+                <div class="form-group">
+                    <label for="verifySecretKey">Secret Key:</label>
+                    <input type="text" id="verifySecretKey" placeholder="Enter the same secret key" value="JBSWY3DPEHPK3PXP">
+                </div>
+                <div class="form-group">
+                    <label for="verifyToken">TOTP Token:</label>
+                    <input type="text" id="verifyToken" placeholder="Enter the 6-digit token" maxlength="6">
+                </div>
+                <button class="btn" onclick="verifyTOTP()">Verify TOTP</button>
+                
+                <div id="verifyResult"></div>
+            </div>
+
+            <div class="note">
+                <strong>Note:</strong> 
+                <ul style="margin-top: 10px; margin-left: 20px;">
+                    <li>Use a Base32 encoded secret key (e.g., JBSWY3DPEHPK3PXP)</li>
+                    <li>TOTP tokens are valid for 30 seconds</li>
+                    <li>The same secret key must be used for both generation and verification</li>
+                    <li>This uses the standard TOTP algorithm (RFC 6238)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let autoRefreshInterval = null;
+
+        async function generateTOTP() {
+            const secretKey = document.getElementById('secretKey').value.trim();
+            const generateResult = document.getElementById('generateResult');
+            const tokenDisplay = document.getElementById('tokenDisplay');
+            const timer = document.getElementById('timer');
+            const autoRefreshBtn = document.getElementById('autoRefreshBtn');
+
+            if (!secretKey) {
+                generateResult.innerHTML = '<div class="result error">Please enter a secret key</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/totp/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ secret_key: secretKey })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    generateResult.innerHTML = '<div class="result success">TOTP generated successfully!</div>';
+                    tokenDisplay.textContent = data.token;
+                    tokenDisplay.style.display = 'block';
+                    timer.style.display = 'block';
+                    
+                    // Start auto refresh
+                    startAutoRefresh(secretKey);
+                    
+                    // Update timer
+                    updateTimer(data.remainingSeconds);
+                } else {
+                    generateResult.innerHTML = `<div class="result error">Error: ${data.error}</div>`;
+                }
+            } catch (error) {
+                console.error('Error generating TOTP:', error);
+                generateResult.innerHTML = '<div class="result error">Failed to generate TOTP. Please check if the server is running.</div>';
+            }
+        }
+
+        async function verifyTOTP() {
+            const secretKey = document.getElementById('verifySecretKey').value.trim();
+            const token = document.getElementById('verifyToken').value.trim();
+            const verifyResult = document.getElementById('verifyResult');
+
+            if (!secretKey || !token) {
+                verifyResult.innerHTML = '<div class="result error">Please enter both secret key and token</div>';
+                return;
+            }
+
+            if (token.length !== 6 || !/^\d{6}$/.test(token)) {
+                verifyResult.innerHTML = '<div class="result error">Token must be exactly 6 digits</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/totp/verify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        secret_key: secretKey,
+                        token: token
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    if (data.verified) {
+                        verifyResult.innerHTML = '<div class="result success">✅ TOTP verification successful!</div>';
+                    } else {
+                        verifyResult.innerHTML = '<div class="result error">❌ TOTP verification failed. Token may be expired or incorrect.</div>';
+                    }
+                } else {
+                    verifyResult.innerHTML = `<div class="result error">Error: ${data.error}</div>`;
+                }
+            } catch (error) {
+                console.error('Error verifying TOTP:', error);
+                verifyResult.innerHTML = '<div class="result error">Failed to verify TOTP. Please check if the server is running.</div>';
+            }
+        }
+
+        function startAutoRefresh(secretKey) {
+            const autoRefreshBtn = document.getElementById('autoRefreshBtn');
+            
+            if (autoRefreshInterval) {
+                // Stop auto refresh
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                autoRefreshBtn.textContent = 'Start Auto Refresh';
+                autoRefreshBtn.style.display = 'none';
+                return;
+            }
+
+            // Start auto refresh
+            autoRefreshBtn.textContent = 'Stop Auto Refresh';
+            autoRefreshBtn.style.display = 'inline-block';
+            
+            autoRefreshInterval = setInterval(async () => {
+                try {
+                    const response = await fetch('/api/totp/generate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ secret_key: secretKey })
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        document.getElementById('tokenDisplay').textContent = data.token;
+                        updateTimer(data.remainingSeconds);
+                    }
+                } catch (error) {
+                    console.error('Auto refresh error:', error);
+                }
+            }, 1000); // Update every second
+        }
+
+        function updateTimer(remainingSeconds) {
+            const timer = document.getElementById('timer');
+            timer.textContent = `Valid for ${remainingSeconds} seconds`;
+        }
+
+        // Allow Enter key to submit forms
+        document.getElementById('secretKey').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                generateTOTP();
+            }
+        });
+
+        document.getElementById('verifyToken').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                verifyTOTP();
+            }
+        });
+
+        // Auto-generate on page load
+        window.addEventListener('load', function() {
+            setTimeout(generateTOTP, 1000);
+        });
+    </script>
+</body>
+</html> 
